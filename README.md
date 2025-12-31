@@ -57,7 +57,7 @@ The prediction model:
 
 ## Disclaimer
 
-⚠️ **Important**: The Bank of Canada never gives financial advice. This tool is for educational purposes only. These projections are illustrative and should not be used as the basis for any financial decisions. Always consult with qualified financial professionals for advice specific to your circumstances.
+⚠️ **Important**: This tool is for educational purposes only. These projections are illustrative and should not be used as the basis for any financial decisions. Always consult with qualified financial professionals for advice specific to your circumstances.
 
 ## About
 
