@@ -3,6 +3,7 @@ House Price Prediction App
 Based on Bank of Canada economic indicators and research
 """
 
+import datetime
 import streamlit as st
 
 # Page configuration
@@ -162,6 +163,7 @@ with col1:
     
     core_inflation = (cpi_trim + cpi_median) / 2
     st.info(f"**Core Inflation (Average):** {core_inflation:.2f}%")
+    base_inflation_rate = max(core_inflation, 0.0)
     
     # Mortgage Payment Shocks
     mortgage_shock = st.slider(
@@ -235,6 +237,16 @@ with col2:
 # Calculation Logic
 st.header("Price Prediction")
 
+current_year = datetime.datetime.now().year
+prediction_year = st.slider(
+    "Prediction Year",
+    min_value=current_year,
+    max_value=current_year + 30,
+    value=min(current_year + 1, current_year + 30),
+    step=1,
+    help="Year the price prediction applies to"
+)
+
 # Calculate resilience factor based on productivity and credit conditions
 # Higher productivity and credit conditions provide resilience against interest rate increases
 resilience_factor = ((productivity / 10.0) + (credit_conditions / 10.0)) / 2
@@ -246,7 +258,7 @@ mortgage_impact = -(mortgage_shock * 0.5) * weight_mortgage
 supply_impact = -(housing_supply - 2.0) * 1.0 * weight_supply  # Above average supply reduces prices
 
 # Positive impacts (increase price)
-inflation_impact = (core_inflation - 2.0) * 1.5 * weight_inflation  # Target is ~2%
+inflation_adjustment = (core_inflation - 2.0) * 1.5 * weight_inflation  # Deviation from 2% target
 credit_impact = (credit_conditions - 5.0) * 1.0 * weight_credit
 productivity_impact = (productivity - 5.0) * 1.2 * weight_productivity
 trade_impact = trade_policy * 0.5 * weight_trade
@@ -261,15 +273,22 @@ total_impact = (
     adjusted_interest_impact +
     adjusted_mortgage_impact +
     supply_impact +
-    inflation_impact +
+    inflation_adjustment +
     credit_impact +
     productivity_impact +
     trade_impact +
     immigration_impact
 )
 
-# Calculate predicted price
-predicted_price = current_price * (1 + total_impact / 100.0)
+years_ahead = max(prediction_year - current_year, 0)
+
+# Base inflation grows the nominal price; adjustments apply on top
+base_factor = 1 + base_inflation_rate / 100.0
+adjustment_factor = 1 + total_impact / 100.0
+annual_factor = base_factor * adjustment_factor
+
+# Apply annualized impact over the chosen horizon
+predicted_price = current_price * (annual_factor ** years_ahead)
 price_change = predicted_price - current_price
 price_change_pct = (price_change / current_price) * 100
 
@@ -284,7 +303,7 @@ with col_res1:
 
 with col_res2:
     st.metric(
-        label="Predicted Price",
+        label=f"Predicted Price ({prediction_year})",
         value=f"${predicted_price:,.2f}",
         delta=f"{price_change_pct:+.2f}%"
     )
@@ -306,6 +325,13 @@ st.header("📋 Summary of Deliberations")
 summary_text = f"""
 **Economic Analysis and Logic:**
 
+**Prediction Year:** {prediction_year}
+**Horizon:** {years_ahead} year(s) from {current_year}
+
+**Base Nominal Growth:**
+- **Core Inflation Base:** {base_inflation_rate:.2f}% per year compounded
+- **Inflation Deviation Adjustment:** {inflation_adjustment:.2f}% (vs. 2% target)
+
 **Negative Price Factors:**
 - **Policy Interest Rate Impact:** {adjusted_interest_impact:.2f}% 
   - Current rate: {policy_rate}% vs. benchmark 2.50%
@@ -322,10 +348,9 @@ summary_text = f"""
   - Higher supply relative to baseline reduces price pressure
 
 **Positive Price Factors:**
-- **Core Inflation (Underlying):** {inflation_impact:.2f}%
-  - Average of CPI-trim ({cpi_trim}%) and CPI-median ({cpi_median}%) = {core_inflation:.2f}%
-  - These measures help 'separate the signal from the noise'
-  - Inflation above target (~2%) typically supports nominal price growth
+- **Inflation Deviation (vs. 2% target):** {inflation_adjustment:.2f}%
+    - Average of CPI-trim ({cpi_trim}%) and CPI-median ({cpi_median}%) = {core_inflation:.2f}%
+    - Base inflation already compounded separately; this adjustment reflects being above/below target
 
 - **Credit Conditions:** {credit_impact:.2f}%
   - Current ease of financing: {credit_conditions:.1f}/10
@@ -348,7 +373,7 @@ The model incorporates resilience based on productivity ({productivity:.1f}/10) 
 When these factors are strong, the housing market shows more stability despite higher interest rates and mortgage shocks.
 Current resilience factor: {resilience_factor:.1%}
 
-**Net Impact:** {total_impact:+.2f}% → Predicted price change from ${current_price:,.2f} to ${predicted_price:,.2f}
+**Net Impact ({prediction_year}):** Base {base_inflation_rate:.2f}% × Adjustments {total_impact:+.2f}% per year → Predicted price change from ${current_price:,.2f} to ${predicted_price:,.2f}
 """
 
 st.text_area("Detailed Breakdown", summary_text, height=500)
